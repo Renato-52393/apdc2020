@@ -1,0 +1,32 @@
+package pt.unl.fct.di.apdc.alfa.util;
+
+public class EventData {
+	
+	public String eventsName;
+	public String date;
+	public String origin;
+	public String description;
+	//public String routeId;
+	public String time;
+	public String markers;
+	public String token;
+
+	
+	public EventData() {
+		
+	}
+	
+	public EventData(String eventsName, String date, String origin,String description, String time,String markers,String token) {
+		this.eventsName = eventsName;
+		this.date = date;
+		this.origin=origin;
+		this.description = description;
+		//this.routeId=routeId;
+		this.time=time;
+		this.markers=markers;
+		this.token=token;
+		
+	}
+
+
+}

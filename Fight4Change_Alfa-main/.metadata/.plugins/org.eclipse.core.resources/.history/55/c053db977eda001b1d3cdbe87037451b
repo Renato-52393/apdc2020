@@ -1,0 +1,76 @@
+package pt.unl.fct.di.apdc.alfa.resources;
+
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+import org.apache.http.client.entity.EntityBuilder;
+import pt.unl.fct.di.apdc.alfa.util.RouteData;
+
+import com.google.cloud.datastore.*;
+
+import javax.ws.rs.Consumes;
+
+import javax.ws.rs.POST;
+
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+
+import org.apache.commons.codec.digest.DigestUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
+
+@Path("/createEvent")
+@Produces(MediaType.APPLICATION_JSON + ";charset=UTF-8")
+public class EventResource {
+
+
+	private final Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
+	private static final Logger LOG = Logger.getLogger(EventResource.class.getName());
+	private final KeyFactory eventsKeyFactory = datastore.newKeyFactory().setKind("Event");
+
+	public EventResource() {
+	}
+
+	@POST
+	@Path("/")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response registerEvent(RouteData data) {
+		LOG.fine("Register event attempt by user: " + data.username);
+		
+		Key logKey = datastore.newKeyFactory().addAncestors(PathElement.of("Users", data.email)).setKind("UserLog")
+				.newKey(data.email);
+		Entity log = datastore.get(logKey);
+
+		/*if (log == null) {
+			return Response.status(Status.BAD_REQUEST).entity("User is not logged in.").build();
+		}
+*/
+		Transaction txn = datastore.newTransaction();
+
+		try {
+			Key eventKey = eventsKeyFactory.newKey(data.email);
+
+			Entity.Builder newEvent = Entity.newBuilder(eventKey);
+
+			newEvent.set("user_name", data.username)
+			.set("user_email", data.email)
+			.set("event_origin", data.origin)
+			.set("event_destination", data.destination)
+			//.set("user_routeId", DigestUtils.sha512Hex(data.routeId))
+			.set("event_time", data.time);
+
+			txn.add(newRoute.build());
+			txn.commit();
+			
+			return Response.ok().build();
+
+		} finally {
+			if (txn.isActive()) {
+				txn.rollback();
+			}
+		}
+	}
+}

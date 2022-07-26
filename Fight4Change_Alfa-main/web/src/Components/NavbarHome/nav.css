@@ -1,0 +1,13 @@
+.photo{
+    height: 100px;
+    width: 100px;
+    transform: translate(20%,-10%);
+    left: 0;
+    top: 0;
+    position: absolute;
+    
+}
+
+.active{
+    border-bottom: 3px solid #01bf71;
+}

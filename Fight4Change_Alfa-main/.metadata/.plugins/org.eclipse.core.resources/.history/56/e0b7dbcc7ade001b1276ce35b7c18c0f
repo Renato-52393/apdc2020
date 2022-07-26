@@ -1,0 +1,28 @@
+package pt.unl.fct.di.apdc.alfa.util;
+
+public class EventData {
+	
+	public String username;
+	public String email;
+	public String origin;
+	public String destination;
+	//public String routeId;
+	public String time;
+
+	
+	public EventData() {
+		
+	}
+	
+	public EventData(String username, String email, String origin,String destination, String time) {
+		this.username = username;
+		this.email = email;
+		this.origin=origin;
+		this.destination = destination;
+		//this.routeId=routeId;
+		this.time=time;
+		
+	}
+
+
+}

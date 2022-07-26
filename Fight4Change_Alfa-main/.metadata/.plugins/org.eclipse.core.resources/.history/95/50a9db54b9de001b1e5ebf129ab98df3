@@ -1,0 +1,181 @@
+package pt.unl.fct.di.apdc.alfa.resources;
+
+import java.util.logging.Logger;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+
+import com.google.appengine.repackaged.org.apache.commons.codec.digest.DigestUtils;
+import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreOptions;
+import com.google.cloud.datastore.Entity;
+import com.google.cloud.datastore.Key;
+import com.google.cloud.datastore.KeyFactory;
+import com.google.cloud.datastore.PathElement;
+import com.google.cloud.datastore.Transaction;
+
+import pt.unl.fct.di.apdc.alfa.util.Constants;
+import pt.unl.fct.di.apdc.alfa.util.RegisterData;
+
+@Path("/update")
+@Produces(MediaType.APPLICATION_JSON + ";charset=utf-8")
+public class ProfileResource {
+
+	private static final String USER = "USER";
+	private static final String GBO = "GBO";
+	private static final String GA = "GA";
+	private static final String SU = "SU";
+
+	private final Datastore datastore =	DatastoreOptions.getDefaultInstance().getService();
+	private final KeyFactory userKeyFactory = datastore.newKeyFactory().setKind("User");
+	private final KeyFactory tokensKeyFactory = datastore.newKeyFactory().setKind("Token");
+	private static final Logger LOG = Logger.getLogger(LoginResource.class.getName());
+
+	public ProfileResource() {}
+
+	@POST
+	@Path("/role/{user}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response changeRoles(@PathParam("user") String username1, RegisterData data) {
+		LOG.fine("Change of roles attempt by user: " + username1);
+
+		Key userKey = userKeyFactory.newKey(username1);
+		Entity user = datastore.get(userKey);
+
+		Key userKey2 = userKeyFactory.newKey(data.username);
+		Entity user2 = datastore.get(userKey2);
+
+		Key logKey = datastore.newKeyFactory()
+				.addAncestors(PathElement.of("User",data.username))
+				.setKind("UserLog").newKey(data.username);
+		Entity log = datastore.get(logKey);
+		
+		Transaction txn = datastore.newTransaction();
+
+		try {
+			if(user == null || user2 == null) {
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).entity("User does not exist.").build();
+			}
+			if(!user2.getString("role").equals(USER)) {
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).entity("Do not have permission to change '" + data.username + "' role.").build();
+			}
+			if(user.getString("role").equals(USER) || user.getString("role").equals(GBO)) {
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).entity("Do not have permission to change '" + data.username + "' role.").build();
+			}
+			if(user.getString("role").equals(GA) && user2.getString("role").equals(SU)) {
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).entity("Do not have permission to change '" + data.username + "' role.").build();
+			}
+			if(log != null) {
+				log = Entity.newBuilder(logKey)
+						.set("Token_username", log.getString("Token_username")).set("Token_id", log.getString("Token_id"))
+						.set("role", data.role)
+						.set("Token_creation", log.getLong("Token_creation")).set("Token_expiration", log.getLong("Token_expiration"))
+						.build();
+				
+				txn.put(log);
+			}
+			user2 = Entity.newBuilder(userKey2)
+					.set("user_name", user2.getString("user_name"))
+					.set("user_pwd", user2.getString("user_pwd"))
+					.set("user_email",user2.getString("user_email"))
+					.set("user_role", data.role)
+					.set("user_account_status", user2.getString("user_account_status"))
+					.set("user_phone", user2.getString("user_phone"))
+					.set("user_address", user2.getString("user_address"))
+					.set("user_zipcode", user2.getString("user_zipcode"))
+					.set("user_dateofbirth", user2.getString("user_dateofbirth"))
+					.set("user_gender", user2.getString("user_gender"))
+					.build();
+			
+			
+			txn.put(user2);
+			txn.commit();
+			LOG.info("User role updated successfully.");
+			return Response.ok().build();
+
+		}finally {
+			if(txn.isActive()) {
+				txn.rollback();
+			}
+
+		}
+	}
+
+
+	@POST
+	@Path("/profile")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response changeAttributes(RegisterData data,@Context HttpServletRequest request,
+            @Context HttpHeaders headers) {
+		LOG.fine("Change of attributes attempt by user: " + data.username);
+		
+		 String token = headers.getHeaderString(HttpHeaders.AUTHORIZATION)
+	                .substring(Constants.AUTHENTICATION_SCHEME.length()).trim();
+
+		 Key tokenKey = tokensKeyFactory.newKey(token);
+		 Entity tokenEnt = datastore.get(tokenKey);
+		 String email = tokenEnt.getString("token_user");
+		
+		Key logKey = datastore.newKeyFactory().addAncestors(PathElement.of("Users",email )).setKind("UserLog")
+				.newKey(email);
+		Entity log = datastore.get(logKey);
+	
+
+		if(log == null) {
+			return Response.status(Status.BAD_REQUEST).entity("User is not logged in.").build();
+		}
+		if (!data.validPassword())
+			return Response.status(Status.BAD_REQUEST).entity("Invalid password").build();
+
+		Transaction txn = datastore.newTransaction();
+
+		try {
+			Entity user = txn.get(userKey);
+			if(user == null) {
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).entity("User does not exists.").build();
+			}
+			if(!(data.role.equals("") || data.status.equals(""))) {
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).entity("Do not have permission to change attributes.").build();
+			}
+
+			user = Entity.newBuilder(userKey)
+					.set("user_name", data.username.equals("")?user.getString("user_name"):data.username)
+					.set("user_pwd", DigestUtils.sha512Hex(data.password))
+					.set("user_email",data.userId.equals("")?user.getString("user_email"):data.userId)
+					.set("user_role", user.getString("user_role"))
+					.set("user_account_status", user.getString("user_account_status"))
+					.set("user_phone", data.phone.equals("") ? user.getString("user_phone") : data.phone)
+					.set("user_address",  data.address.equals("") ? user.getString("user_address") : data.address)
+					.set("user_zipcode",  data.zipcode.equals("") ? user.getString("user_zipcode") : data.zipcode)
+					.set("user_dateofbirth",  data.dateofbirth.equals("") ? user.getString("user_dateofbirth") : data.dateofbirth)
+					.set("user_gender",  data.gender.equals("") ? user.getString("user_gender") : data.gender)
+					.build();
+
+			txn.put(user);
+			txn.commit();
+			LOG.info("Profile updated successfully.");
+			return Response.ok().build();
+		}finally {
+			if(txn.isActive()) {
+				txn.rollback();
+			}
+
+		}
+
+	}
+}

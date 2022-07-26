@@ -1,0 +1,5 @@
+INDEX VERSION 1.4+/Users/goncalomoura/Documents/verFinal/Fight4Change_Alfa/.metadata/.plugins/org.eclipse.wst.jsdt.core/indexes
+1335642792.index
+571549601.index
+2332674498.index
+4144816720.index

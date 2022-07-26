@@ -1,0 +1,62 @@
+package pt.unl.fct.di.apdc.alfa.resources;
+
+import java.util.ArrayList;
+import java.util.List;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+
+import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreOptions;
+import com.google.cloud.datastore.Entity;
+import com.google.cloud.datastore.Key;
+import com.google.cloud.datastore.KeyFactory;
+import com.google.cloud.datastore.Query;
+import com.google.cloud.datastore.QueryResults;
+import com.google.cloud.datastore.Transaction;
+import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
+import com.google.gson.Gson;
+
+@Path("/events")
+public class JoinEventResource {
+
+	private final Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
+	private final KeyFactory eventsKeyFactory = datastore.newKeyFactory().setKind("Event");
+
+	private final Gson g = new Gson();
+
+	public JoinEventResource() {
+	}
+
+	@GET
+	@Path("/list/")
+	public Response listEvents(@PathParam("username") String username) {
+
+		Transaction txn = datastore.newTransaction();
+
+		try {
+
+			Query<Entity> query = Query.newEntityQueryBuilder().setKind("User")
+					.setFilter(PropertyFilter.eq("username", username)).build();
+
+			QueryResults<Entity> attributes = datastore.run(query);
+
+			List<String> events = new ArrayList();
+
+			attributes.forEachRemaining(userlog -> {
+				events.add(userlog.getString("event_username"));
+				events.add(userlog.getString("event_email"));
+				events.add(userlog.getString("event_time"));
+				events.add(userlog.getString("event_destination"));
+				events.add(userlog.getString("event_origin"));
+			});
+			txn.commit();
+			return Response.ok(g.toJson(events)).build();
+		} finally {
+			if (txn.isActive())
+				txn.rollback();
+		}
+	}
+}

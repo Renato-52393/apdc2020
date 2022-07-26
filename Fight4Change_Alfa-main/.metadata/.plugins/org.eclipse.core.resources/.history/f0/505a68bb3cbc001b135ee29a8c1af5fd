@@ -1,0 +1,76 @@
+package pt.unl.fct.di.apdc.alfa.resources;
+
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+
+import org.apache.http.client.entity.EntityBuilder;
+import pt.unl.fct.di.apdc.alfa.util.RouteData;
+
+import com.google.cloud.datastore.*;
+
+import javax.ws.rs.Consumes;
+
+import javax.ws.rs.POST;
+
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+
+import org.apache.commons.codec.digest.DigestUtils;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
+
+@Path("/CriarRota")
+@Produces(MediaType.APPLICATION_JSON + ";charset=UTF-8")
+public class RouteResource {
+
+
+	private final Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
+	private static final Logger LOG = Logger.getLogger(RouteResource.class.getName());
+	private final KeyFactory userRoutes = datastore.newKeyFactory().setKind("Routes");
+
+	public RouteResource() {
+	}
+
+	@POST
+	@Path("/")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response registerRoute(RouteData data) {
+		LOG.fine("Register route attempt by user: " + data.username);
+		
+		Key logKey = datastore.newKeyFactory().addAncestors(PathElement.of("Users", data.email)).setKind("UserLog")
+				.newKey(data.email);
+		Entity log = datastore.get(logKey);
+
+		/*if (log == null) {
+			return Response.status(Status.BAD_REQUEST).entity("User is not logged in.").build();
+		}*/
+
+		Transaction txn = datastore.newTransaction();
+
+		try {
+			Key routeKey = userRoutes.newKey(data.email);
+
+			Entity.Builder newRoute = Entity.newBuilder(routeKey);
+
+			newRoute.set("user_name", data.username)
+			.set("user_email", data.email)
+			.set("route_origin", data.origin)
+			.set("route_destination", data.destination)
+			//.set("user_routeId", DigestUtils.sha512Hex(data.routeId))
+			.set("route_time", data.time);
+
+			txn.add(newRoute.build());
+			txn.commit();
+			
+			return Response.ok().build();
+
+		} finally {
+			if (txn.isActive()) {
+				txn.rollback();
+			}
+		}
+	}
+}

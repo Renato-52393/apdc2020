@@ -1,0 +1,12 @@
+*{
+  font-family: 'Montserrat', sans-serif;
+}
+.MenuB{
+  margin-left: -680px;
+  height: 80px;
+  width: 80px;
+  padding-top: 40px;
+  transform: translate(0,-25%);
+  color:rgba(22,126,101,1);
+  font-family: 'Montserrat', sans-serif;
+}
